@@ -1,0 +1,239 @@
+// REPPD Database Schema
+// University-focused social media platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for university students
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String?  @unique
+  university   String
+  section      String?
+  year         Int
+  stream       String?  // Engineering, Arts, Commerce, etc.
+  gender       String?
+  universityId String   @unique // Student ID from university
+  password     String
+  idFrontUrl   String   // URL to front of university ID card
+  idBackUrl    String   // URL to back of university ID card
+  interests    String[] // Array of interests
+  isVerified   Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  posts        Post[]
+  requests     Request[]
+  communities  CommunityMember[]
+  sentMessages Message[] @relation("MessageSender")
+  receivedMessages Message[] @relation("MessageReceiver")
+  notices      Notice[]
+
+  @@map("users")
+}
+
+// Community model for groups, clubs, hostels, etc.
+model Community {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  type        CommunityType // CLUB, HOSTEL, SECTION, YEAR, CUSTOM
+  university  String
+  isApproved  Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  members     CommunityMember[]
+  posts       Post[]
+  requests    Request[]
+  messages    Message[]
+
+  @@map("communities")
+}
+
+// Junction table for community membership
+model CommunityMember {
+  id          String   @id @default(cuid())
+  userId      String
+  communityId String
+  role        MemberRole @default(MEMBER) // ADMIN, MODERATOR, MEMBER
+  joinedAt    DateTime @default(now())
+
+  // Relations
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, communityId])
+  @@map("community_members")
+}
+
+// Post model for main feed
+model Post {
+  id          String   @id @default(cuid())
+  content     String
+  imageUrls   String[] // Array of image URLs
+  tags        String[] // Array of tags
+  visibility  PostVisibility @default(PUBLIC) // PUBLIC, COMMUNITY, SECTION, YEAR
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  communityId String?
+  community   Community? @relation(fields: [communityId], references: [id], onDelete: SetNull)
+
+  @@map("posts")
+}
+
+// Request model for carpools, help requests, etc.
+model Request {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  type        RequestType // CARPOOL, HELP, LENS, NOTES, OTHER
+  tags        String[] // Array of tags
+  visibility  PostVisibility @default(PUBLIC)
+  isActive    Boolean  @default(true)
+  isFulfilled Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  communityId String?
+  community   Community? @relation(fields: [communityId], references: [id], onDelete: SetNull)
+
+  @@map("requests")
+}
+
+// Notice model for announcements, events, etc.
+model Notice {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  type        NoticeType // EVENT, AUDITION, WORKSHOP, ANNOUNCEMENT, DEADLINE
+  imageUrls   String[] // Array of image URLs
+  validUntil  DateTime?
+  isActive    Boolean  @default(true)
+  isFreshersHighlighted Boolean @default(false)
+  university  String
+  targetYear  Int? // Specific year if targeted
+  targetSection String? // Specific section if targeted
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@map("notices")
+}
+
+// Message model for chat system
+model Message {
+  id          String   @id @default(cuid())
+  content     String
+  type        MessageType @default(TEXT) // TEXT, IMAGE, FILE
+  fileUrl     String? // URL for file/image messages
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  // Relations
+  senderId    String
+  sender      User      @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId  String?   // For direct messages
+  receiver    User?     @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  communityId String?   // For community messages
+  community   Community? @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+// University information model
+model UniversityInfo {
+  id          String   @id @default(cuid())
+  university  String
+  type        InfoType // PROFESSOR, CLUB, CLASSROOM, FOOD_PLACE, HANGOUT
+  name        String
+  description String?
+  location    String?
+  contact     String?
+  imageUrls   String[]
+  rating      Float?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("university_info")
+}
+
+// Enums
+enum CommunityType {
+  CLUB
+  HOSTEL
+  SECTION
+  YEAR
+  CUSTOM
+}
+
+enum MemberRole {
+  ADMIN
+  MODERATOR
+  MEMBER
+}
+
+enum PostVisibility {
+  PUBLIC
+  COMMUNITY
+  SECTION
+  YEAR
+  GENDER
+}
+
+enum RequestType {
+  CARPOOL
+  HELP
+  LENS
+  NOTES
+  BOOKS
+  OTHER
+}
+
+enum NoticeType {
+  EVENT
+  AUDITION
+  WORKSHOP
+  ANNOUNCEMENT
+  DEADLINE
+  EXAM
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+}
+
+enum InfoType {
+  PROFESSOR
+  CLUB
+  CLASSROOM
+  FOOD_PLACE
+  HANGOUT
+  LIBRARY
+  FACILITY
+}
