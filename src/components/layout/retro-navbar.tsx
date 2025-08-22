@@ -34,6 +34,7 @@ export function RetroNavbar() {
 
   // Check for management access
   const [hasManagementAccess, setHasManagementAccess] = useState(false)
+  const [userRole, setUserRole] = useState('')
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -42,6 +43,7 @@ export function RetroNavbar() {
         const access = JSON.parse(managementAccess)
         if (access.hasAccess && access.expiresAt > Date.now()) {
           setHasManagementAccess(true)
+          setUserRole(access.role)
         } else {
           localStorage.removeItem('managementAccess')
         }
@@ -79,16 +81,43 @@ export function RetroNavbar() {
                   </Link>
                 ))}
 
-                {/* Management Crown - Only show if user has management access */}
+                {/* Management Access - Show different options based on role */}
                 {hasManagementAccess && (
-                  <Link
-                    href="/dev-portal"
-                    className="text-white/80 hover:text-white transition-colors duration-300 font-space font-medium hover:retro-glow flex items-center gap-1"
-                    title="Developer Portal"
-                  >
-                    <Crown className="w-4 h-4 text-yellow-400" />
-                    Manage
-                  </Link>
+                  <>
+                    {/* Always show dev portal for any management access */}
+                    <Link
+                      href="/dev-portal"
+                      className="text-white/80 hover:text-white transition-colors duration-300 font-space font-medium hover:retro-glow flex items-center gap-1"
+                      title="Developer Portal"
+                    >
+                      <Crown className="w-4 h-4 text-yellow-400" />
+                      Dev Portal
+                    </Link>
+
+                    {/* Show CR admin for CR role or developer */}
+                    {(userRole === 'cr' || userRole === 'developer') && (
+                      <Link
+                        href="/cr-admin"
+                        className="text-white/80 hover:text-white transition-colors duration-300 font-space font-medium hover:retro-glow flex items-center gap-1"
+                        title="CR Admin Panel"
+                      >
+                        <Crown className="w-4 h-4 text-orange-400" />
+                        CR Admin
+                      </Link>
+                    )}
+
+                    {/* Show Community Portal for community leaders */}
+                    {(userRole === 'community_leader' || userRole === 'developer') && (
+                      <Link
+                        href="/community-portal"
+                        className="text-white/80 hover:text-white transition-colors duration-300 font-space font-medium hover:retro-glow flex items-center gap-1"
+                        title="Community Portal"
+                      >
+                        <Crown className="w-4 h-4 text-purple-400" />
+                        Community Portal
+                      </Link>
+                    )}
+                  </>
                 )}
               </>
             ) : (
@@ -232,20 +261,72 @@ export function RetroNavbar() {
       {/* Mobile Navigation */}
       {isMenuOpen && (
         <div className="md:hidden glass-morphism border-t border-white/10 animate-in slide-in-from-top duration-200">
-          <div className="px-4 py-6 space-y-4">
+          <div className="px-4 py-6 space-y-2">
             {isLoggedIn ? (
               // Logged-in mobile navigation
               <>
+                {/* User Info Section */}
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-retro-cyan to-retro-purple flex items-center justify-center">
+                    <User className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-white font-semibold text-sm">{session?.user?.name || 'User'}</p>
+                    <p className="text-white/60 text-xs">{session?.user?.university || 'University'}</p>
+                  </div>
+                </div>
+
+                {/* Navigation Items */}
                 {loggedInNavigationItems.map((item) => (
                   <Link
                     key={item.name}
                     href={item.href}
-                    className="block text-white/80 hover:text-white transition-colors duration-300 font-space font-medium py-3 px-2 rounded-lg hover:bg-white/5"
+                    className="flex items-center gap-3 text-white/80 hover:text-white transition-colors duration-300 font-space font-medium py-3 px-3 rounded-lg hover:bg-white/10"
                     onClick={() => setIsMenuOpen(false)}
                   >
+                    <item.icon className="w-5 h-5" />
                     {item.name}
                   </Link>
                 ))}
+
+                {/* Management Access */}
+                {hasManagementAccess && (
+                  <>
+                    {/* Always show dev portal for any management access */}
+                    <Link
+                      href="/dev-portal"
+                      className="flex items-center gap-3 text-yellow-400 hover:text-yellow-300 transition-colors duration-300 font-space font-medium py-3 px-3 rounded-lg hover:bg-yellow-500/10 border border-yellow-500/20"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <Crown className="w-5 h-5" />
+                      Developer Portal
+                    </Link>
+
+                    {/* Show CR admin for CR role or developer */}
+                    {(userRole === 'cr' || userRole === 'developer') && (
+                      <Link
+                        href="/cr-admin"
+                        className="flex items-center gap-3 text-orange-400 hover:text-orange-300 transition-colors duration-300 font-space font-medium py-3 px-3 rounded-lg hover:bg-orange-500/10 border border-orange-500/20"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        <Crown className="w-5 h-5" />
+                        CR Admin Panel
+                      </Link>
+                    )}
+
+                    {/* Show Community Portal for community leaders */}
+                    {(userRole === 'community_leader' || userRole === 'developer') && (
+                      <Link
+                        href="/community-portal"
+                        className="flex items-center gap-3 text-purple-400 hover:text-purple-300 transition-colors duration-300 font-space font-medium py-3 px-3 rounded-lg hover:bg-purple-500/10 border border-purple-500/20"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        <Crown className="w-5 h-5" />
+                        Community Portal
+                      </Link>
+                    )}
+                  </>
+                )}
 
                 {/* Mobile Profile Section */}
                 <div className="border-t border-white/10 pt-4 mt-4">

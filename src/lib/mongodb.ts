@@ -1,9 +1,11 @@
 import { MongoClient, Db, ObjectId } from 'mongodb'
 import { z } from 'zod'
 
-// Environment validation
-const mongoUri = process.env.MONGODB_URI || process.env.MONGODB_LOCAL_URI
-if (!mongoUri) {
+// Environment validation - allow development without MongoDB
+const mongoUri = process.env.MONGODB_URI || process.env.MONGODB_LOCAL_URI || 'mongodb://localhost:27017'
+
+// In development, we can work without MongoDB for UI testing
+if (!mongoUri && process.env.NODE_ENV === 'production') {
   throw new Error('Invalid/Missing environment variable: "MONGODB_URI" or "MONGODB_LOCAL_URI"')
 }
 
@@ -66,7 +68,24 @@ export const COLLECTIONS = {
   ANALYTICS: 'analytics',
   UNIVERSITIES: 'universities',
   ID_VERIFICATIONS: 'id_verifications',
-  OCR_DATA: 'ocr_data'
+  OCR_DATA: 'ocr_data',
+  // Missing collections that need to be added:
+  ACCESS_CODES: 'access_codes',
+  ASSIGNMENTS: 'assignments',
+  SUBMISSIONS: 'submissions',
+  NOTES: 'notes',
+  ANNOUNCEMENTS: 'announcements',
+  NOTIFICATIONS: 'notifications',
+  CHAT_ROOMS: 'chat_rooms',
+  MESSAGES: 'messages',
+  EVENTS: 'events',
+  ATTENDANCE: 'attendance',
+  COMMENTS: 'comments',
+  LIKES: 'likes',
+  SHARES: 'shares',
+  FILES: 'files',
+  SESSIONS: 'sessions',
+  AUDIT_LOGS: 'audit_logs'
 } as const
 
 // Database connection health check

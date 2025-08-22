@@ -1,7 +1,10 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
+import { mockAPI, shouldUseMockData } from '@/lib/mock-data'
+import { scaledMockAPI, shouldUseScaledMockData } from '@/lib/scaled-mock-data'
+import { MediaUpload } from '@/components/posts/media-upload'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -105,16 +108,65 @@ export default function FeedPage() {
   const { data: session } = useSession()
   const [newPost, setNewPost] = useState('')
   const [isAnonymous, setIsAnonymous] = useState(false)
-  // In production, start with empty posts array and load from API
-  const [posts, setPosts] = useState(process.env.NODE_ENV === 'development' ? mockPosts : [])
+  const [posts, setPosts] = useState<any[]>([])
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [hasMorePosts, setHasMorePosts] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
+  const [isLoading, setIsLoading] = useState(true)
+  const [mediaFiles, setMediaFiles] = useState<any[]>([])
+  const [showMediaUpload, setShowMediaUpload] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  // Fix hydration issues
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   const [reportModal, setReportModal] = useState<{
     isOpen: boolean
     postId: string
     content: string
   }>({ isOpen: false, postId: '', content: '' })
+
+  // Load posts on component mount
+  useEffect(() => {
+    loadPosts()
+  }, [])
+
+  const loadPosts = async () => {
+    try {
+      setIsLoading(true)
+
+      if (shouldUseScaledMockData()) {
+        // Use scaled mock data for 2000+ students pilot
+        console.log('Loading scaled mock data for pilot program')
+        const result = await scaledMockAPI.getPosts(1, 20)
+        setPosts(result.posts)
+        setHasMorePosts(result.hasMore)
+        setCurrentPage(1)
+      } else if (shouldUseMockData()) {
+        // Use regular mock data for development
+        const result = await mockAPI.getPosts()
+        setPosts(result.posts)
+        setHasMorePosts(result.hasMore)
+      } else {
+        // Use real API
+        const response = await fetch('/api/posts')
+        if (response.ok) {
+          const result = await response.json()
+          setPosts(result.posts || [])
+          setHasMorePosts(result.hasMore || false)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load posts:', error)
+      // Fallback to scaled mock data
+      const result = await scaledMockAPI.getPosts(1, 20)
+      setPosts(result.posts)
+      setHasMorePosts(result.hasMore)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   // Empty state component
   const EmptyState = () => (
@@ -136,39 +188,125 @@ export default function FeedPage() {
     </div>
   )
 
-  const handleCreatePost = () => {
-    if (!newPost.trim()) return
+  const handleCreatePost = async () => {
+    console.log('Create post clicked!', { newPost, isAnonymous, mediaFiles })
 
-    const post = {
-      id: Date.now().toString(),
-      author: {
-        name: isAnonymous ? 'Anonymous Student' : (session?.user?.name || 'Anonymous'),
-        universityId: isAnonymous ? 'ANON' : (session?.user?.universityId || 'UNKNOWN'),
-        year: isAnonymous ? 0 : (session?.user?.year || 1),
-        stream: isAnonymous ? 'Anonymous' : (session?.user?.stream || 'Unknown'),
-        section: isAnonymous ? '' : (session?.user?.section || 'A'),
-        avatar: isAnonymous ? '🕶️' : '👤'
-      },
-      content: newPost,
-      timestamp: 'Just now',
-      likes: 0,
-      comments: 0,
-      shares: 0,
-      type: 'text',
-      tags: [],
-      isAnonymous
+    if (!newPost.trim()) {
+      console.log('Post is empty, not creating')
+      alert('Please enter some content for your post!')
+      return
     }
 
-    setPosts([post, ...posts])
-    setNewPost('')
+    try {
+      console.log('Creating post...')
+
+      // Create post object directly (simplified approach)
+      const newPostObj = {
+        id: Date.now().toString(),
+        content: newPost,
+        author: {
+          id: session?.user?.id || 'anonymous',
+          name: isAnonymous ? 'Anonymous Student' : (session?.user?.name || 'Current User'),
+          avatar: isAnonymous ? '🕶️' : (session?.user?.image || '👤'),
+          university: session?.user?.university || 'SRM University Sonipat',
+          year: session?.user?.year || 3,
+          stream: session?.user?.stream || 'Computer Science Engineering',
+          section: session?.user?.section || 'A'
+        },
+        timestamp: 'Just now',
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        isLiked: false,
+        isBookmarked: false,
+        isAnonymous,
+        images: mediaFiles.filter(f => f.type === 'image').map(f => f.url || f.preview),
+        videos: mediaFiles.filter(f => f.type === 'video').map(f => f.url || f.preview),
+        type: mediaFiles.length > 0 ? 'media' : 'text',
+        tags: []
+      }
+
+      console.log('New post object:', newPostObj)
+
+      // Add to posts list
+      setPosts(prevPosts => {
+        console.log('Adding post to list, current posts:', prevPosts.length)
+        return [newPostObj, ...prevPosts]
+      })
+
+      // Clear form
+      setNewPost('')
+      setIsAnonymous(false)
+      setMediaFiles([])
+      setShowMediaUpload(false)
+
+      console.log('Post created successfully!')
+
+      // Optional: Save to database in background
+      if (!shouldUseMockData()) {
+        try {
+          const response = await fetch('/api/posts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newPostObj)
+          })
+          if (response.ok) {
+            console.log('Post saved to database')
+          }
+        } catch (dbError) {
+          console.log('Database save failed, but post created locally:', dbError)
+        }
+      }
+
+    } catch (error) {
+      console.error('Failed to create post:', error)
+      alert('Error creating post. Please try again.')
+    }
   }
 
   const handleLike = (postId: string) => {
-    setPosts(posts.map(post =>
-      post.id === postId
-        ? { ...post, likes: post.likes + 1 }
-        : post
-    ))
+    console.log('Like clicked for post:', postId)
+
+    setPosts(prevPosts =>
+      prevPosts.map(post => {
+        if (post.id === postId) {
+          const isCurrentlyLiked = post.isLiked || false
+          const newLikeCount = isCurrentlyLiked ? post.likes - 1 : post.likes + 1
+
+          console.log(`Post ${postId}: ${isCurrentlyLiked ? 'unliking' : 'liking'}, new count: ${newLikeCount}`)
+
+          return {
+            ...post,
+            likes: Math.max(0, newLikeCount), // Ensure likes don't go below 0
+            isLiked: !isCurrentlyLiked
+          }
+        }
+        return post
+      })
+    )
+  }
+
+  const handleComment = (postId: string) => {
+    console.log('Comment clicked for post:', postId)
+    // For now, just increment comment count
+    setPosts(prevPosts =>
+      prevPosts.map(post =>
+        post.id === postId
+          ? { ...post, comments: post.comments + 1 }
+          : post
+      )
+    )
+  }
+
+  const handleShare = (postId: string) => {
+    console.log('Share clicked for post:', postId)
+    setPosts(prevPosts =>
+      prevPosts.map(post =>
+        post.id === postId
+          ? { ...post, shares: post.shares + 1 }
+          : post
+      )
+    )
   }
 
   const loadMorePosts = async () => {
@@ -176,51 +314,82 @@ export default function FeedPage() {
 
     setIsLoadingMore(true)
 
-    // Simulate API call
-    setTimeout(() => {
-      // Generate more mock posts
-      const morePosts = Array.from({ length: 5 }, (_, index) => ({
-        id: `${Date.now()}-${index}`,
-        author: {
-          name: `Student ${currentPage * 5 + index + 1}`,
-          universityId: `CS202${currentPage}${index}`,
-          year: Math.floor(Math.random() * 4) + 1,
-          stream: 'Computer Science Engineering',
-          section: String.fromCharCode(65 + Math.floor(Math.random() * 3)),
-          avatar: ['👨‍💻', '👩‍💻', '👨‍🎓', '👩‍🎓'][Math.floor(Math.random() * 4)]
-        },
-        content: `This is a sample post from page ${currentPage + 1}. Lorem ipsum dolor sit amet, consectetur adipiscing elit.`,
-        timestamp: `${Math.floor(Math.random() * 24)} hours ago`,
-        likes: Math.floor(Math.random() * 50),
-        comments: Math.floor(Math.random() * 20),
-        shares: Math.floor(Math.random() * 10),
-        type: 'text' as const,
-        tags: ['Sample', 'Post']
-      }))
+    try {
+      if (shouldUseScaledMockData()) {
+        // Load more posts from scaled mock data for 2000+ students
+        const result = await scaledMockAPI.getPosts(currentPage + 1, 15)
+        setPosts(prev => [...prev, ...result.posts])
+        setCurrentPage(prev => prev + 1)
+        setHasMorePosts(result.hasMore)
+        console.log(`Loaded page ${currentPage + 1}, total posts: ${posts.length + result.posts.length}`)
+      } else {
+        // Fallback to simple mock generation
+        const morePosts = Array.from({ length: 10 }, (_, index) => ({
+          id: `${Date.now()}-${index}`,
+          author: {
+            name: `Student ${currentPage * 10 + index + 1}`,
+            universityId: `CS202${currentPage}${index}`,
+            year: Math.floor(Math.random() * 4) + 1,
+            stream: 'Computer Science Engineering',
+            section: String.fromCharCode(65 + Math.floor(Math.random() * 3)),
+            avatar: ['👨‍💻', '👩‍💻', '👨‍🎓', '👩‍🎓'][Math.floor(Math.random() * 4)]
+          },
+          content: `This is a sample post from page ${currentPage + 1}. Lorem ipsum dolor sit amet, consectetur adipiscing elit.`,
+          timestamp: `${Math.floor(Math.random() * 24)} hours ago`,
+          likes: Math.floor(Math.random() * 50),
+          comments: Math.floor(Math.random() * 20),
+          shares: Math.floor(Math.random() * 10),
+          type: 'text' as const,
+          tags: ['Sample', 'Post'],
+          isLiked: false,
+          isBookmarked: false,
+          isAnonymous: false,
+          images: []
+        }))
 
-      setPosts(prev => [...prev, ...morePosts])
-      setCurrentPage(prev => prev + 1)
-      setIsLoadingMore(false)
+        setPosts(prev => [...prev, ...morePosts])
+        setCurrentPage(prev => prev + 1)
 
-      // Simulate end of posts after 5 pages
-      if (currentPage >= 5) {
-        setHasMorePosts(false)
+        // Stop loading more after 10 pages for demo
+        if (currentPage >= 9) {
+          setHasMorePosts(false)
+        }
       }
-    }, 1000)
+    } catch (error) {
+      console.error('Failed to load more posts:', error)
+    } finally {
+      setIsLoadingMore(false)
+    }
   }
 
   return (
-    <div className="min-h-screen pt-16 sm:pt-20 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen pt-16 sm:pt-20 px-2 sm:px-4 lg:px-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-3xl sm:text-4xl font-retro font-bold text-white mb-2">
+        <div className="mb-4 sm:mb-6 lg:mb-8 px-2 sm:px-0">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-retro font-bold text-white mb-2">
             Campus Feed 🚀
           </h1>
           <p className="text-white/60 font-space">
             What's happening at SRM University Sonipat
           </p>
         </div>
+
+        {/* Debug Info - Only show after mount to prevent hydration issues */}
+        {process.env.NODE_ENV === 'development' && mounted && (
+          <Card className="glass-morphism border-yellow-500/20 mb-4">
+            <CardContent className="pt-4">
+              <div className="text-xs text-yellow-400 space-y-1">
+                <p>🚀 REPPD Pilot Program (2000+ Students)</p>
+                <p>Posts loaded: {posts.length}</p>
+                <p>Scaled mock data: {mounted ? (shouldUseScaledMockData() ? 'Active' : 'Inactive') : 'Loading...'}</p>
+                <p>Session: {session?.user?.name || 'Not logged in'}</p>
+                <p>Page: {currentPage} | Has more: {hasMorePosts ? 'Yes' : 'No'}</p>
+                <p>Loading: {isLoading ? 'Yes' : 'No'}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Create Post */}
         <Card className="glass-morphism border-white/20 mb-6 sm:mb-8">
@@ -255,15 +424,27 @@ export default function FeedPage() {
               </span>
             </div>
 
+            {/* Media Upload Section */}
+            {showMediaUpload && (
+              <div className="mt-4">
+                <MediaUpload
+                  onFilesChange={setMediaFiles}
+                  maxFiles={4}
+                  acceptedTypes={['image/*', 'video/*']}
+                />
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex gap-2">
-                <Button variant="ghost" size="sm" className="text-white/60 hover:text-white">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`text-white/60 hover:text-white ${showMediaUpload ? 'bg-white/10 text-retro-cyan' : ''}`}
+                  onClick={() => setShowMediaUpload(!showMediaUpload)}
+                >
                   <ImageIcon className="w-4 h-4 mr-2" />
-                  Photo
-                </Button>
-                <Button variant="ghost" size="sm" className="text-white/60 hover:text-white">
-                  <Video className="w-4 h-4 mr-2" />
-                  Video
+                  {showMediaUpload ? 'Hide Media' : 'Add Media'}
                 </Button>
                 <Button variant="ghost" size="sm" className="text-white/60 hover:text-white">
                   <Calendar className="w-4 h-4 mr-2" />
@@ -271,20 +452,62 @@ export default function FeedPage() {
                 </Button>
               </div>
 
-              <Button
-                onClick={handleCreatePost}
-                disabled={!newPost.trim()}
-                className="w-full sm:w-auto bg-gradient-to-r from-retro-pink to-retro-orange hover:from-retro-pink/80 hover:to-retro-orange/80"
-              >
-                {isAnonymous ? 'Post Anonymously' : 'Post'}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    console.log('Post button clicked!')
+                    handleCreatePost()
+                  }}
+                  disabled={!newPost.trim()}
+                  className="flex-1 sm:flex-none sm:w-auto bg-gradient-to-r from-retro-pink to-retro-orange hover:from-retro-pink/80 hover:to-retro-orange/80"
+                >
+                  {isAnonymous ? 'Post Anonymously' : 'Post'}
+                </Button>
+
+                {/* Test button for debugging */}
+                <Button
+                  onClick={() => {
+                    console.log('Test button clicked!')
+                    const testPost = {
+                      id: 'test-' + Date.now(),
+                      content: 'Test post created at ' + new Date().toLocaleTimeString(),
+                      author: {
+                        name: 'Test User',
+                        avatar: '🧪'
+                      },
+                      timestamp: 'Just now',
+                      likes: 0,
+                      comments: 0,
+                      shares: 0,
+                      isLiked: false,
+                      isBookmarked: false,
+                      isAnonymous: false,
+                      images: [],
+                      type: 'text',
+                      tags: []
+                    }
+                    setPosts(prev => [testPost, ...prev])
+                    console.log('Test post added!')
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="border-retro-cyan text-retro-cyan hover:bg-retro-cyan/10"
+                >
+                  Test
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Posts Feed */}
         <div className="space-y-6">
-          {posts.length === 0 ? (
+          {isLoading ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 border-4 border-retro-cyan border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-white/60 font-space">Loading posts...</p>
+            </div>
+          ) : posts.length === 0 ? (
             <EmptyState />
           ) : (
             posts.map((post) => (
@@ -356,12 +579,22 @@ export default function FeedPage() {
                       {post.likes}
                     </Button>
                     
-                    <Button variant="ghost" size="sm" className="text-white/60 hover:text-retro-cyan transition-colors">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleComment(post.id)}
+                      className="text-white/60 hover:text-retro-cyan transition-colors"
+                    >
                       <MessageCircle className="w-4 h-4 mr-2" />
                       {post.comments}
                     </Button>
-                    
-                    <Button variant="ghost" size="sm" className="text-white/60 hover:text-retro-orange transition-colors">
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleShare(post.id)}
+                      className="text-white/60 hover:text-retro-orange transition-colors"
+                    >
                       <Share2 className="w-4 h-4 mr-2" />
                       {post.shares}
                     </Button>

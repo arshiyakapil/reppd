@@ -32,17 +32,37 @@ export default function LoginPage() {
       // Check management code first if provided
       let hasManagementAccess = false
       if (formData.hasManagementCode && managementCode) {
-        if (managementCode === '19022552') {
-          hasManagementAccess = true
-          // Store management access in session
-          localStorage.setItem('managementAccess', JSON.stringify({
-            hasAccess: true,
-            code: managementCode,
-            role: 'developer',
-            expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
-          }))
-        } else {
-          setError('Invalid management code')
+        try {
+          const response = await fetch('/api/auth/verify-access-code', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ accessCode: managementCode })
+          })
+
+          const result = await response.json()
+
+          if (result.success) {
+            hasManagementAccess = true
+            // Store management access in session
+            localStorage.setItem('managementAccess', JSON.stringify({
+              hasAccess: true,
+              code: managementCode,
+              role: result.role,
+              permissions: result.permissions,
+              university: result.university,
+              accessLevel: result.accessLevel,
+              expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
+            }))
+          } else {
+            setError(result.error || 'Invalid access code')
+            setIsLoading(false)
+            return
+          }
+        } catch (error) {
+          console.error('Access code verification error:', error)
+          setError('Failed to verify access code')
           setIsLoading(false)
           return
         }
