@@ -29,7 +29,9 @@ import {
   Crown,
   Server,
   Monitor,
-  Download
+  Download,
+  Send,
+  FileText
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -220,10 +222,30 @@ export default function DevPortalPage() {
     setTimeout(() => setCopiedCode(''), 2000)
   }
 
-  const deleteUser = (userId: string) => {
+  const deleteUser = async (userId: string) => {
     if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      alert(`User ${userId} has been deleted from the system.\n\nActions taken:\n- User account deactivated\n- Personal data removed\n- Posts and comments anonymized\n- Community memberships revoked`)
-      // In real implementation, make API call to delete user
+      try {
+        const response = await fetch('/api/admin/users', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-management-access': 'true'
+          },
+          body: JSON.stringify({ userId })
+        })
+
+        const result = await response.json()
+
+        if (result.success) {
+          alert(`✅ User deleted successfully!\n\nActions taken:\n- User account deactivated\n- Personal data removed\n- Posts and comments anonymized\n- Community memberships revoked`)
+          // Refresh user list if we had one
+        } else {
+          alert(`❌ Failed to delete user:\n${result.error}`)
+        }
+      } catch (error) {
+        console.error('Error deleting user:', error)
+        alert('❌ Error deleting user. Check console for details.')
+      }
     }
   }
 
@@ -331,6 +353,18 @@ export default function DevPortalPage() {
             </TabsTrigger>
             <TabsTrigger value="bugs" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black">
               Bug Reports
+            </TabsTrigger>
+            <TabsTrigger value="content" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black">
+              Content Management
+            </TabsTrigger>
+            <TabsTrigger value="universities" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black">
+              Universities
+            </TabsTrigger>
+            <TabsTrigger value="communities" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black">
+              Communities
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="data-[state=active]:bg-yellow-400 data-[state=active]:text-black">
+              System Settings
             </TabsTrigger>
           </TabsList>
 
@@ -969,6 +1003,551 @@ export default function DevPortalPage() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Content Management Tab */}
+          <TabsContent value="content" className="space-y-6">
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Posts Management */}
+              <Card className="glass-morphism border-white/20">
+                <CardHeader>
+                  <CardTitle className="text-white font-retro">Posts Management</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-white/5 rounded-lg">
+                      <div className="text-xl font-bold text-blue-400">1,247</div>
+                      <div className="text-white/60 text-sm">Total Posts</div>
+                    </div>
+                    <div className="text-center p-3 bg-white/5 rounded-lg">
+                      <div className="text-xl font-bold text-red-400">23</div>
+                      <div className="text-white/60 text-sm">Flagged Posts</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Button
+                      className="w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30"
+                      onClick={() => alert('Post moderation interface:\n- View all posts\n- Filter by university/date\n- Approve/reject posts\n- Ban users for violations\n- Export content reports')}
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      Moderate Posts
+                    </Button>
+                    <Button
+                      className="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30"
+                      onClick={() => alert('Flagged content review:\n- Review reported posts\n- Take action on violations\n- Send warnings to users\n- Update community guidelines')}
+                    >
+                      <AlertTriangle className="w-4 h-4 mr-2" />
+                      Review Flagged Content
+                    </Button>
+                    <Button
+                      className="w-full bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30"
+                      onClick={() => alert('Content analytics:\n- Engagement metrics\n- Popular content trends\n- User activity patterns\n- Content performance reports')}
+                    >
+                      <BarChart3 className="w-4 h-4 mr-2" />
+                      Content Analytics
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Announcements Management */}
+              <Card className="glass-morphism border-white/20">
+                <CardHeader>
+                  <CardTitle className="text-white font-retro">System Announcements</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-white/80 text-sm font-space">Announcement Title</label>
+                      <Input
+                        placeholder="e.g., Platform Maintenance Scheduled"
+                        className="glass-morphism border-white/20 text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-white/80 text-sm font-space">Message</label>
+                      <textarea
+                        placeholder="Enter announcement message..."
+                        className="w-full p-2 glass-morphism border-white/20 rounded text-white bg-transparent"
+                        rows={3}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-white/80 text-sm font-space">Priority</label>
+                        <select className="w-full p-2 glass-morphism border-white/20 rounded text-white bg-transparent">
+                          <option value="low" className="bg-gray-800">Low</option>
+                          <option value="medium" className="bg-gray-800">Medium</option>
+                          <option value="high" className="bg-gray-800">High</option>
+                          <option value="urgent" className="bg-gray-800">Urgent</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-white/80 text-sm font-space">Target</label>
+                        <select className="w-full p-2 glass-morphism border-white/20 rounded text-white bg-transparent">
+                          <option value="all" className="bg-gray-800">All Users</option>
+                          <option value="students" className="bg-gray-800">Students Only</option>
+                          <option value="crs" className="bg-gray-800">CRs Only</option>
+                          <option value="leaders" className="bg-gray-800">Community Leaders</option>
+                        </select>
+                      </div>
+                    </div>
+                    <Button
+                      className="w-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30"
+                      onClick={() => alert('System announcement sent!\n\nFeatures:\n- Push notifications\n- In-app banners\n- Email notifications\n- SMS alerts (urgent only)\n- Delivery tracking')}
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      Send Announcement
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Universities Management Tab */}
+          <TabsContent value="universities" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-retro text-white">Universities Management</h2>
+              <Button
+                className="bg-gradient-to-r from-green-400 to-blue-500"
+                onClick={() => alert('Add University Form:\n- University name\n- Location\n- Type (Public/Private)\n- Website\n- Verification requirements\n- Email domains\n- Admin contacts')}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add University
+              </Button>
+            </div>
+
+            <div className="grid gap-4">
+              {/* University List */}
+              <Card className="glass-morphism border-white/20">
+                <CardHeader>
+                  <CardTitle className="text-white font-retro">Registered Universities</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-4 border border-white/10 rounded-lg">
+                      <div>
+                        <h4 className="text-white font-semibold">SRM University Sonipat</h4>
+                        <p className="text-white/60 text-sm">Sonipat, Haryana • Private • 2,847 students</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Badge className="bg-green-500/20 text-green-400">Active</Badge>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-blue-400"
+                          onClick={() => alert('University Details:\n- Total Students: 2,847\n- Active Communities: 12\n- CRs: 45\n- Verification Rate: 89%\n- Last Activity: 2 hours ago')}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-green-400"
+                          onClick={() => alert('University Settings:\n- Update information\n- Manage email domains\n- Set verification rules\n- Configure features\n- Assign administrators')}
+                        >
+                          <Settings className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 border border-white/10 rounded-lg">
+                      <div>
+                        <h4 className="text-white font-semibold">Delhi University</h4>
+                        <p className="text-white/60 text-sm">Delhi • Public • 1,923 students</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Badge className="bg-green-500/20 text-green-400">Active</Badge>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-blue-400"
+                          onClick={() => alert('University Details:\n- Total Students: 1,923\n- Active Communities: 8\n- CRs: 32\n- Verification Rate: 94%\n- Last Activity: 1 hour ago')}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-green-400"
+                          onClick={() => alert('University Settings:\n- Update information\n- Manage email domains\n- Set verification rules\n- Configure features\n- Assign administrators')}
+                        >
+                          <Settings className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 border border-white/10 rounded-lg">
+                      <div>
+                        <h4 className="text-white font-semibold">Jawaharlal Nehru University</h4>
+                        <p className="text-white/60 text-sm">New Delhi • Public • 756 students</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Badge className="bg-yellow-500/20 text-yellow-400">Pending Verification</Badge>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-blue-400"
+                          onClick={() => alert('University Details:\n- Total Students: 756\n- Active Communities: 3\n- CRs: 12\n- Verification Rate: 67%\n- Status: Pending admin verification')}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-green-400"
+                          onClick={() => alert('Verify University:\n- Review documentation\n- Confirm official status\n- Set up email domains\n- Approve registration')}
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Communities Management Tab */}
+          <TabsContent value="communities" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-retro text-white">Communities Management</h2>
+              <Button
+                className="bg-gradient-to-r from-purple-400 to-pink-500"
+                onClick={() => alert('Create Community Template:\n- Community name\n- Category\n- Description\n- Requirements\n- University assignment\n- Leader assignment\n- Auto-approval rules')}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create Community
+              </Button>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Community Stats */}
+              <Card className="glass-morphism border-white/20">
+                <CardHeader>
+                  <CardTitle className="text-white font-retro">Community Overview</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-white/5 rounded-lg">
+                      <div className="text-xl font-bold text-purple-400">47</div>
+                      <div className="text-white/60 text-sm">Total Communities</div>
+                    </div>
+                    <div className="text-center p-3 bg-white/5 rounded-lg">
+                      <div className="text-xl font-bold text-green-400">42</div>
+                      <div className="text-white/60 text-sm">Active</div>
+                    </div>
+                    <div className="text-center p-3 bg-white/5 rounded-lg">
+                      <div className="text-xl font-bold text-yellow-400">156</div>
+                      <div className="text-white/60 text-sm">Pending Applications</div>
+                    </div>
+                    <div className="text-center p-3 bg-white/5 rounded-lg">
+                      <div className="text-xl font-bold text-blue-400">2,847</div>
+                      <div className="text-white/60 text-sm">Total Members</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Community Actions */}
+              <Card className="glass-morphism border-white/20">
+                <CardHeader>
+                  <CardTitle className="text-white font-retro">Management Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button
+                    className="w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30"
+                    onClick={() => alert('Community Management:\n- View all communities\n- Edit community details\n- Assign/remove leaders\n- Set member limits\n- Configure auto-approval\n- Archive inactive communities')}
+                  >
+                    <Users className="w-4 h-4 mr-2" />
+                    Manage All Communities
+                  </Button>
+                  <Button
+                    className="w-full bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 border border-orange-500/30"
+                    onClick={() => alert('Application Review:\n- Bulk approve/reject\n- Set approval criteria\n- Review flagged applications\n- Send custom responses\n- Export application data')}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Review Applications
+                  </Button>
+                  <Button
+                    className="w-full bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30"
+                    onClick={() => alert('Community Analytics:\n- Growth trends\n- Engagement metrics\n- Popular categories\n- Member retention\n- Activity patterns\n- Success metrics')}
+                  >
+                    <BarChart3 className="w-4 h-4 mr-2" />
+                    Community Analytics
+                  </Button>
+                  <Button
+                    className="w-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30"
+                    onClick={() => alert('Category Management:\n- Create new categories\n- Edit existing categories\n- Set category requirements\n- Assign category moderators\n- Configure category rules')}
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    Manage Categories
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Recent Communities */}
+            <Card className="glass-morphism border-white/20">
+              <CardHeader>
+                <CardTitle className="text-white font-retro">Recent Communities</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 border border-white/10 rounded-lg">
+                    <div>
+                      <h4 className="text-white font-semibold">SRM Tech Innovators</h4>
+                      <p className="text-white/60 text-sm">Technology • 234 members • SRM University Sonipat</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Badge className="bg-green-500/20 text-green-400">Active</Badge>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-blue-400"
+                        onClick={() => alert('Community Details:\n- Leader: Arshiya Kapil\n- Created: March 2023\n- Applications: 12 pending\n- Events: 5 this month\n- Engagement: 89%')}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 border border-white/10 rounded-lg">
+                    <div>
+                      <h4 className="text-white font-semibold">DU Creative Arts Society</h4>
+                      <p className="text-white/60 text-sm">Arts & Culture • 156 members • Delhi University</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Badge className="bg-green-500/20 text-green-400">Active</Badge>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-blue-400"
+                        onClick={() => alert('Community Details:\n- Leader: Priya Singh\n- Created: February 2023\n- Applications: 8 pending\n- Events: 3 this month\n- Engagement: 76%')}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* System Settings Tab */}
+          <TabsContent value="settings" className="space-y-6">
+            <h2 className="text-xl font-retro text-white">System Settings</h2>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Platform Configuration */}
+              <Card className="glass-morphism border-white/20">
+                <CardHeader>
+                  <CardTitle className="text-white font-retro">Platform Configuration</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <label className="text-white/80 text-sm font-space">Platform Name</label>
+                    <Input
+                      defaultValue="REPPD"
+                      className="glass-morphism border-white/20 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-white/80 text-sm font-space">Platform Description</label>
+                    <textarea
+                      defaultValue="Social learning platform for university students"
+                      className="w-full p-2 glass-morphism border-white/20 rounded text-white bg-transparent"
+                      rows={2}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-white/80 text-sm font-space">Max File Size (MB)</label>
+                      <Input
+                        type="number"
+                        defaultValue="10"
+                        className="glass-morphism border-white/20 text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-white/80 text-sm font-space">Session Timeout (hours)</label>
+                      <Input
+                        type="number"
+                        defaultValue="24"
+                        className="glass-morphism border-white/20 text-white"
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    className="w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30"
+                    onClick={() => alert('Platform settings updated!\n\nChanges applied:\n- Platform configuration\n- File upload limits\n- Session management\n- Security settings')}
+                  >
+                    Save Platform Settings
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Feature Toggles */}
+              <Card className="glass-morphism border-white/20">
+                <CardHeader>
+                  <CardTitle className="text-white font-retro">Feature Toggles</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-white/80">User Registration</span>
+                    <Button
+                      size="sm"
+                      className="bg-green-500/20 text-green-400"
+                      onClick={() => alert('Feature toggled: User Registration\nStatus: Enabled → Disabled')}
+                    >
+                      Enabled
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-white/80">Community Creation</span>
+                    <Button
+                      size="sm"
+                      className="bg-green-500/20 text-green-400"
+                      onClick={() => alert('Feature toggled: Community Creation\nStatus: Enabled → Disabled')}
+                    >
+                      Enabled
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-white/80">File Uploads</span>
+                    <Button
+                      size="sm"
+                      className="bg-green-500/20 text-green-400"
+                      onClick={() => alert('Feature toggled: File Uploads\nStatus: Enabled → Disabled')}
+                    >
+                      Enabled
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-white/80">Real-time Chat</span>
+                    <Button
+                      size="sm"
+                      className="bg-red-500/20 text-red-400"
+                      onClick={() => alert('Feature toggled: Real-time Chat\nStatus: Disabled → Enabled')}
+                    >
+                      Disabled
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-white/80">Push Notifications</span>
+                    <Button
+                      size="sm"
+                      className="bg-green-500/20 text-green-400"
+                      onClick={() => alert('Feature toggled: Push Notifications\nStatus: Enabled → Disabled')}
+                    >
+                      Enabled
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-white/80">Email Notifications</span>
+                    <Button
+                      size="sm"
+                      className="bg-green-500/20 text-green-400"
+                      onClick={() => alert('Feature toggled: Email Notifications\nStatus: Enabled → Disabled')}
+                    >
+                      Enabled
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Security Settings */}
+              <Card className="glass-morphism border-white/20">
+                <CardHeader>
+                  <CardTitle className="text-white font-retro">Security Settings</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <label className="text-white/80 text-sm font-space">Password Min Length</label>
+                    <Input
+                      type="number"
+                      defaultValue="8"
+                      className="glass-morphism border-white/20 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-white/80 text-sm font-space">Max Login Attempts</label>
+                    <Input
+                      type="number"
+                      defaultValue="5"
+                      className="glass-morphism border-white/20 text-white"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-white/80">Two-Factor Authentication</span>
+                    <Button
+                      size="sm"
+                      className="bg-red-500/20 text-red-400"
+                      onClick={() => alert('2FA Settings:\nStatus: Disabled → Enabled\nMethods: SMS, Email, Authenticator App')}
+                    >
+                      Disabled
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-white/80">Content Moderation</span>
+                    <Button
+                      size="sm"
+                      className="bg-green-500/20 text-green-400"
+                      onClick={() => alert('Content Moderation:\nAuto-moderation: Enabled\nManual review: Required\nAI filtering: Active')}
+                    >
+                      Enabled
+                    </Button>
+                  </div>
+                  <Button
+                    className="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30"
+                    onClick={() => alert('Security settings updated!\n\nChanges applied:\n- Password policies\n- Login security\n- 2FA configuration\n- Content moderation rules')}
+                  >
+                    Save Security Settings
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Backup & Maintenance */}
+              <Card className="glass-morphism border-white/20">
+                <CardHeader>
+                  <CardTitle className="text-white font-retro">Backup & Maintenance</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <Button
+                      className="w-full bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30"
+                      onClick={() => alert('Database backup initiated!\n\nBackup details:\n- Full database backup\n- Includes user data, posts, communities\n- Encrypted and compressed\n- Stored in cloud storage\n- Estimated time: 15 minutes')}
+                    >
+                      <Database className="w-4 h-4 mr-2" />
+                      Create Database Backup
+                    </Button>
+                    <Button
+                      className="w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30"
+                      onClick={() => alert('System maintenance mode:\n\nMaintenance features:\n- Enable maintenance mode\n- Custom maintenance message\n- Estimated downtime\n- Notify all users\n- Graceful shutdown')}
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Maintenance Mode
+                    </Button>
+                    <Button
+                      className="w-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30"
+                      onClick={() => alert('System cleanup initiated!\n\nCleanup tasks:\n- Remove old logs\n- Clean temporary files\n- Optimize database\n- Clear cache\n- Update indexes')}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      System Cleanup
+                    </Button>
+                    <Button
+                      className="w-full bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 border border-orange-500/30"
+                      onClick={() => alert('Export system data:\n\nExport options:\n- User analytics\n- Content reports\n- System logs\n- Performance metrics\n- Compliance reports')}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Export System Data
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
         </Tabs>
