@@ -7,30 +7,32 @@ export async function GET() {
   await client.connect();
   const db = client.db(process.env.MONGODB_DB_NAME);
   
-  const posts = await db.collection('posts').aggregate([
-    { $lookup: { from: 'users', localField: 'authorId', foreignField: '_id', as: 'author' }},
-    { $unwind: '$author' }, { $sort: { createdAt: -1 }}, { $limit: 50 }
+  const notes = await db.collection('notes').aggregate([
+    { $lookup: { from: 'users', localField: 'uploaderId', foreignField: '_id', as: 'uploader' }},
+    { $unwind: '$uploader' },
+    { $sort: { createdAt: -1 }}
   ]).toArray();
   
   client.close();
-  return NextResponse.json({ posts });
+  return NextResponse.json({ notes });
 }
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession();
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   
-  const { content, type = 'text' } = await req.json();
+  const { title, subject, fileUrl, description } = await req.json();
   const client = new MongoClient(process.env.MONGODB_URI!);
   await client.connect();
   const db = client.db(process.env.MONGODB_DB_NAME);
   
-  const post = await db.collection('posts').insertOne({
-    content, type, authorId: new ObjectId(session.user.id),
-    likes: [], comments: [], createdAt: new Date(), updatedAt: new Date()
+  const note = await db.collection('notes').insertOne({
+    title, subject, fileUrl, description,
+    uploaderId: new ObjectId(session.user.id),
+    downloads: 0,
+    createdAt: new Date()
   });
   
   client.close();
-  return NextResponse.json({ success: true, postId: post.insertedId });
+  return NextResponse.json({ success: true, noteId: note.insertedId });
 }
-
